@@ -22,6 +22,14 @@ import numpy as np
 from jaxlib import xla_client
 from .gpu_common_utils import GpuLibNotLinkedError
 
+from enum import IntEnum
+
+class RnnCellType(IntEnum):
+  RELU = 0
+  TANH = 1
+  LSTM = 2
+  GRU = 3
+
 for cuda_module_name in [".cuda", "jax_cuda12_plugin"]:
   try:
     _rnn = importlib.import_module(f"{cuda_module_name}._rnn", package="jaxlib")
@@ -39,7 +47,7 @@ if _rnn:
 def cudnn_rnn_lowering(ctx, input, h_0, c_0, weights, seq_lengths, *,
                        input_size: int, hidden_size: int, num_layers: int,
                        dropout: bool, bidirectional: bool,
-                       cudnn_allow_tf32: bool):
+                       cudnn_allow_tf32: bool, mode: RnnCellType):
   """CuDnn RNN."""
   out_dtype = ctx.avals_out[0].dtype
   if out_dtype == np.float32:
@@ -58,7 +66,7 @@ def cudnn_rnn_lowering(ctx, input, h_0, c_0, weights, seq_lengths, *,
   max_seq_length = ctx.avals_in[0].shape[1]
   # workspace_shape = ctx.avals_out[3].shape
   workspace_size, _ = compute_rnn_workspace_reserve_space_sizes(
-      input_size, hidden_size, num_layers, batch_size, max_seq_length,
+      int(mode), input_size, hidden_size, num_layers, batch_size, max_seq_length,
       dropout, bidirectional, cudnn_allow_tf32)
   workspace_shape = (workspace_size,)
   workspace_type = ir.RankedTensorType.get(workspace_shape, ir.F32Type.get())
@@ -68,9 +76,9 @@ def cudnn_rnn_lowering(ctx, input, h_0, c_0, weights, seq_lengths, *,
   if not _rnn:
     raise GpuLibNotLinkedError()
 
-  opaque = _rnn.build_rnn_descriptor(input_size, hidden_size, num_layers,
-                                     batch_size, max_seq_length, dropout,
-                                     bidirectional, cudnn_allow_tf32,
+  opaque = _rnn.build_rnn_descriptor(int(mode), input_size, hidden_size,
+                                     num_layers, batch_size, max_seq_length,
+                                     dropout, bidirectional, cudnn_allow_tf32,
                                      workspace_shape[0],
                                      reserve_space_shape[0])
 
@@ -97,12 +105,12 @@ def _hlo_zeros_f32(shape):
 def cudnn_rnn_bwd_lowering(ctx, dy, dhn, dcn, x, h0, c0, w, y,
                            reserve_space, seq_lengths, *, input_size: int,
                            hidden_size: int, num_layers: int, dropout: bool,
-                           bidirectional: bool, cudnn_allow_tf32: bool):
+                           bidirectional: bool, cudnn_allow_tf32: bool, mode: RnnCellType):
   """CuDnn RNN Backward pass."""
   batch_size = ctx.avals_in[3].shape[0]
   max_seq_length = ctx.avals_in[3].shape[1]
   workspace_size, _ = compute_rnn_workspace_reserve_space_sizes(
-      input_size, hidden_size, num_layers, batch_size, max_seq_length,
+      int(mode), input_size, hidden_size, num_layers, batch_size, max_seq_length,
       dropout, bidirectional, cudnn_allow_tf32)
   workspace_shape = (workspace_size,)
   workspace_type = ir.RankedTensorType.get(workspace_shape, ir.F32Type.get())
@@ -110,9 +118,9 @@ def cudnn_rnn_bwd_lowering(ctx, dy, dhn, dcn, x, h0, c0, w, y,
 
   if _rnn is None:
     raise RuntimeError("cuda couldn't be imported")
-  opaque = _rnn.build_rnn_descriptor(input_size, hidden_size, num_layers,
-                                     batch_size, max_seq_length, dropout,
-                                     bidirectional, cudnn_allow_tf32,
+  opaque = _rnn.build_rnn_descriptor(int(mode), input_size, hidden_size,
+                                     num_layers, batch_size, max_seq_length,
+                                     dropout, bidirectional, cudnn_allow_tf32,
                                      workspace_shape[0],
                                      reserve_space_shape[0])
 

@@ -25,6 +25,7 @@ namespace JAX_GPU_NAMESPACE {
 
 // Compile-time info passed as `opaque` to custom kernel.
 struct RnnDescriptor {
+  int mode; //cudnnRNNMode_t
   int input_size;
   int hidden_size;
   int num_layers;
@@ -39,7 +40,7 @@ struct RnnDescriptor {
 
 // Return (workspace size, reserve space size).
 absl::StatusOr<std::pair<int, int>> RnnComputeWorkspaceReserveSpaceSizes(
-    int input_size, int hidden_size, int num_layers, int batch_size,
+    int mode, int input_size, int hidden_size, int num_layers, int batch_size,
     int max_seq_length, float dropout, bool bidirectional,
     bool cudnn_allow_tf32);
 

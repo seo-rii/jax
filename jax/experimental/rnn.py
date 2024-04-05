@@ -403,6 +403,7 @@ def lstm_fwd(x: Array, h_0: Array, c_0: Array, w: Array, seq_lengths: Array,
       c_0,
       w,
       seq_lengths,
+      mode=gpu_rnn.RnnCellType.LSTM,
       input_size=input_size,
       hidden_size=hidden_size,
       num_layers=num_layers,
@@ -415,14 +416,14 @@ def lstm_fwd(x: Array, h_0: Array, c_0: Array, w: Array, seq_lengths: Array,
 def rnn_abstract_eval(x_aval, h_0_aval, c_0_aval, w_aval, seq_lengths_aval,
                       input_size: int, hidden_size: int, num_layers: int,
                       dropout: float, bidirectional: bool,
-                      cudnn_allow_tf32: bool):
+                      cudnn_allow_tf32: bool, mode: int):
   batch_size, max_seq_length = x_aval.shape[0], x_aval.shape[1]
   num_directions = 2 if bidirectional else 1
   output_shape = (batch_size, max_seq_length, num_directions * hidden_size)
   output_aval = core.ShapedArray(output_shape, x_aval.dtype)
   _, reserve_space_size = (
       gpu_rnn.compute_rnn_workspace_reserve_space_sizes(  # pytype: disable=attribute-error
-          input_size, hidden_size, num_layers, batch_size, max_seq_length,
+          int(mode), input_size, hidden_size, num_layers, batch_size, max_seq_length,
           dropout, bidirectional, cudnn_allow_tf32))
   reserve_space_aval = core.ShapedArray((reserve_space_size,), jnp.float32)
   return output_aval, h_0_aval, c_0_aval, reserve_space_aval
@@ -442,7 +443,7 @@ if gpu_rnn:
 
 def lstm_bwd(input_size: int, hidden_size: int, num_layers: int, dropout: float,
              bidirectional: bool, precision: lax.PrecisionLike,
-             residuals, gradients):
+             residuals, gradients, mode: gpu_rnn.RnnCellType):
   cudnn_allow_tf32 = _lstm_cudnn_allow_tf32(precision)
   x, h_0, c_0, w, seq_lengths, y, reserve_space = residuals
   dy, dh_n, dc_n = gradients
@@ -462,7 +463,8 @@ def lstm_bwd(input_size: int, hidden_size: int, num_layers: int, dropout: float,
       num_layers=num_layers,
       dropout=dropout,
       bidirectional=bidirectional,
-      cudnn_allow_tf32=cudnn_allow_tf32)
+      cudnn_allow_tf32=cudnn_allow_tf32,
+      mode=mode)
   return (dx, dh_0, dc_0, dw, jnp.zeros_like(seq_lengths))
 
 
@@ -470,7 +472,7 @@ def rnn_bwd_abstract_eval(dy_aval, dhn_aval, dcn_aval, x_aval, h0_aval, c0_aval,
                           w_aval, y_aval, reserve_space_aval,
                           seq_lengths_aval, input_size: int, hidden_size: int,
                           num_layers: int, dropout: float, bidirectional: bool,
-                          cudnn_allow_tf32: bool):
+                          cudnn_allow_tf32: bool, mode: gpu_rnn.RnnCellType):
   return x_aval, h0_aval, c0_aval, w_aval
 
 

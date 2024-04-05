@@ -71,7 +71,7 @@ template <>
 namespace JAX_GPU_NAMESPACE {
 
 static absl::StatusOr<std::pair<int, int>>
-DoRnnComputeWorkspaceReserveSpaceSizes(int input_size, int hidden_size,
+DoRnnComputeWorkspaceReserveSpaceSizes(int mode, int input_size, int hidden_size,
                                        int num_layers, int batch_size,
                                        int max_seq_length, float dropout,
                                        bool bidirectional,
@@ -93,7 +93,7 @@ DoRnnComputeWorkspaceReserveSpaceSizes(int input_size, int hidden_size,
       dropout_desc, handle.get(), dropout, nullptr, state_size, 123)));
 
   // TODO(zhangqiaorjc): Handle other kinds of RNN.
-  cudnnRNNMode_t cell_mode = CUDNN_LSTM;
+  cudnnRNNMode_t cell_mode = (cudnnRNNMode_t)mode;
   cudnnRNNBiasMode_t bias_mode = CUDNN_RNN_DOUBLE_BIAS;
   int num_directions = 1;
   cudnnDirectionMode_t dir_mode = CUDNN_UNIDIRECTIONAL;
@@ -145,11 +145,11 @@ DoRnnComputeWorkspaceReserveSpaceSizes(int input_size, int hidden_size,
 }
 
 absl::StatusOr<std::pair<int, int>> RnnComputeWorkspaceReserveSpaceSizes(
-    int input_size, int hidden_size, int num_layers, int batch_size,
+    int mode, int input_size, int hidden_size, int num_layers, int batch_size,
     int max_seq_length, float dropout, bool bidirectional,
     bool cudnn_allow_tf32) {
   return DoRnnComputeWorkspaceReserveSpaceSizes(
-      input_size, hidden_size, num_layers, batch_size, max_seq_length, dropout,
+      mode, input_size, hidden_size, num_layers, batch_size, max_seq_length, dropout,
       bidirectional, cudnn_allow_tf32);
 }
 
@@ -175,7 +175,7 @@ static absl::Status DnnRNNForward_(gpuStream_t stream, void** buffers,
       dropout_desc, handle.get(), d.dropout, nullptr, state_size, 123)));
 
   // TODO(zhangqiaorjc): Handle other kinds of RNN.
-  cudnnRNNMode_t cell_mode = CUDNN_LSTM;
+  cudnnRNNMode_t cell_mode = (cudnnRNNMode_t)d.mode;
   cudnnRNNBiasMode_t bias_mode = CUDNN_RNN_DOUBLE_BIAS;
   int num_directions = 1;
   cudnnDirectionMode_t dir_mode = CUDNN_UNIDIRECTIONAL;
@@ -297,7 +297,7 @@ static absl::Status DnnRNNBackward_(gpuStream_t stream, void** buffers,
       dropout_desc, handle.get(), d.dropout, nullptr, state_size, 123)));
 
   // TODO(zhangqiaorjc): Handle other kinds of RNN.
-  cudnnRNNMode_t cell_mode = CUDNN_LSTM;
+  cudnnRNNMode_t cell_mode = (cudnnRNNMode_t)d.mode;
   cudnnRNNBiasMode_t bias_mode = CUDNN_RNN_DOUBLE_BIAS;
   int num_directions = 1;
   cudnnDirectionMode_t dir_mode = CUDNN_UNIDIRECTIONAL;
